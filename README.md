@@ -6,8 +6,11 @@ Check this page for a list on initial enhancements made by heyjoeway: https://he
 For changes made by me:
 
 Modified ResetOnFloor routines to fix these issues mentioned here:
+
 https://twitter.com/SonicPhysics/status/1385881293406318596
+
 https://twitter.com/SonicPhysics/status/1385341602244222980
+
 https://twitter.com/JSevion/status/1385472712781479937
 
 
