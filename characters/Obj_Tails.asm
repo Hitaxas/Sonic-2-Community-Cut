@@ -1357,11 +1357,15 @@ Tails_Move:
 	bne.w	Obj_Tails_ResetScr
 	btst	#button_left,(Ctrl_2_Held_Logical).w	; is left being pressed?
 	beq.s	Obj_Tails_NotLeft			; if not, branch
+	cmpi.b	#$8,anim(a0)				; is character ducking?
+	beq.w	Obj_Tails_NotLeft	
 	bsr.w	Tails_MoveLeft
 ; loc_1C0D4:
 Obj_Tails_NotLeft:
 	btst	#button_right,(Ctrl_2_Held_Logical).w	; is right being pressed?
 	beq.s	Obj_Tails_NotRight			; if not, branch
+	cmpi.b	#$8,anim(a0)				; is character ducking?
+	beq.w	Obj_Tails_NotRight
 	bsr.w	Tails_MoveRight
 ; loc_1C0E0:
 Obj_Tails_NotRight:
@@ -2322,6 +2326,7 @@ loc_1C83C:
 
 ; loc_1C846:
 Tails_SlopeResist:
+	jmp	Sonic_SlopeResist
 	move.b	angle(a0),d0
 	addi.b	#$60,d0
 	cmpi.b	#$C0,d0
@@ -2394,7 +2399,7 @@ return_1C8B6:
 
 ; loc_1C8B8:
 Tails_SlopeRepel:
-	nop
+	jmp	Sonic_SlopeRepel
 	tst.b	stick_to_convex(a0)
 	bne.s	return_1C8F2
 	tst.w	move_lock(a0)
@@ -2642,35 +2647,99 @@ Tails_ResetOnFloor:
 	clr.b	(Flying_carrying_Sonic_flag).w
 +
 	tst.b	pinball_mode(a0)
-	bne.s	Tails_ResetOnFloor_Part3
-	move.b	#AniIDTailsAni_Walk,anim(a0)
-; loc_1CB5C:
-Tails_ResetOnFloor_Part2:
-	btst	#2,status(a0)
-	beq.s	Tails_ResetOnFloor_Part3
-	bclr	#2,status(a0)
-	move.b	#$F,y_radius(a0) ; this slightly increases Tails' collision height to standing
-	move.b	#9,x_radius(a0)
-	move.b	#AniIDTailsAni_Walk,anim(a0)	; use running/walking/standing animation
-	subq.w	#1,y_pos(a0)	; move Tails up 1 pixel so the increased height doesn't push him slightly into the ground
-; loc_1CB80:
-Tails_ResetOnFloor_Part3:
-	bclr	#1,status(a0)
-	bclr	#5,status(a0)
-	bclr	#4,status(a0)
-	move.b	#0,jumping(a0)
-	move.w	#0,(Chain_Bonus_counter).w
-	move.b	#0,flip_angle(a0)
-	move.b	#0,flip_turned(a0)
-	move.b	#0,flips_remaining(a0)
-	move.w	#0,(Tails_Look_delay_counter).w
+	bne.w	Tails_ResetOnFloor_Part3
+;=====================================================================================================================
+; if up is being held while landing from a momentumless jump, play look up animation. 
+; allows for activiting peelout immediately
+; however, to do so properly requires a frame perfect input... (enjoy, speedrunners!)
+;=====================================================================================================================	
+	btst	#button_up,(Ctrl_1_Held_Logical).w	; is up being pressed?
+	beq.w	.CheckIfDucking				; if not, branch
+	move.b	#7,anim(a0)				; use look up animation
+	bra.w	Tails_ResetOnFloor_Part2	
+;=====================================================================================================================
+; if down is being held while landing from a momentumless jump, play ducking animation. 
+; allows for activiting spindash immediately
+; however, to do so properly requires a frame perfect input... (enjoy, speedrunners!)
+;=====================================================================================================================
+	.CheckIfDucking:	
+		btst	#button_down,(Ctrl_1_Held_Logical).w	; is down being pressed?
+		beq.w	.ReturnToWalkRunDash			; if not, branch
+		tst.w	inertia(a0)				; is character moving?
+		bne.w	.ContinueRolling			; if so, branch
+		bclr	#2,status(a0)				; clear rolling status	
+	        move.b	#$F,y_radius(a0)			; this increases Sonic's collision height to standing
+	        move.b	#9,x_radius(a0)				; adjust Sonic's collision width to standing
+		jsr	Tails_Duck
+		bra.w	TailsROF_Adjust_Y_Pos	
+
+	.ContinueRolling:	
+        	jsr     Obj_Tails_DoRoll			; make character roll
+        	bra.w   Tails_ResetOnFloor_Part3		; still need to clear some flags, etc.
+
+	.ReturnToWalkRunDash:		
+		move.b	#0,anim(a0)
+;=====================================================================================================================
+; this code is called by the code that handles player standing on objects, like platforms or bridges
+; some routines outside of Tails' code can call Tails_ResetOnFloor_Part2
+; when they mean to call Tails_ResetOnFloor_Part2, so fix that here
+;=====================================================================================================================
+; loc_1B0AC:
+Tails_ResetOnFloor_Part2: 
+		btst	#2,status(a0)				; is rolling status set?
+		beq.w	Tails_ResetOnFloor_Part3		; if so, branch
+		bclr	#2,status(a0)				; clear rolling status
+		move.b	#$F,y_radius(a0)			; this increases Tails' collision height to standing
+		move.b	#9,x_radius(a0)				; adjust Sonic's collision width to standing
+		tst.w	x_vel(a0)				; is character moving?
+		bne.w	TailsROF_ReturnToWalkRunDash			; if so, branch	
+
+	.ReturnToIdle:	
+		move.b	#$5,anim(a0)				; use standing/idle animation
+		bra.s	Adjust_Y_Pos2
+
+TailsROF_Adjust_Y_Pos:
+		subq.w	#1,y_pos(a0)
+		bra.s	Tails_ResetOnFloor_Part3	
+
+TailsROF_ReturnToWalkRunDash:		
+		move.b	#0,anim(a0)				; use running/walking/standing animation
+
+Adjust_Y_Pos2:
+		addq.w	#4,y_pos(a0)				
+;=====================================================================================================================
+; clear flags, and signify a true reset on floor
+;=====================================================================================================================
+; loc_1B0DA:
+Tails_ResetOnFloor_Part3:      
+	bclr	#1,status(a0)				; clear in air status
+	bclr	#5,status(a0)				; clear pushing status
+	bclr	#4,status(a0)				; clear rolljump status
+	move.b	#0,jumping(a0)				; clear jumping flag
 	move.b	#0,double_jump_flag(a0)
 	move.b	#0,double_jump_property(a0)
-	cmpi.b	#AniIDTailsAni_Hang2,anim(a0)
-	bne.s	return_1CBC4
-	move.b	#AniIDTailsAni_Walk,anim(a0)
-
-return_1CBC4:
+	move.w	#0,(Chain_Bonus_counter).w
+	move.b	#0,flip_angle(a0)
+	move.b	#0,flips_remaining(a0)
+;=====================================================================================================================
+; if rolling status was already set, we want to branch away from the end of this code
+; this prevents an issue where holding down would cause the character to duck rather than roll in most cases
+;=====================================================================================================================
+	btst    #2,status(a0)				; is status set to rolling?
+	beq.w   return_1CBC4  
+;=====================================================================================================================
+; clear a few more flags
+;=====================================================================================================================
+	move.b  #0,flip_turned(a0)
+	move.w	#0,(Sonic_Look_delay_counter).w
+	cmpi.b	#$14,anim(a0)
+	bne.w	return_1CBC4	
+	move.b	#0,anim(a0)
+	bra.w	return_1CBC4
+;=====================================================================================================================
+; The end
+;=====================================================================================================================
+return_1CBC4:	
 	rts
 ; End of subroutine Tails_ResetOnFloor
 

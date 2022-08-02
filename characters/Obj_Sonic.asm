@@ -547,11 +547,15 @@ Sonic_Move:
 	bne.w	Obj_Sonic_ResetScr
 	btst	#button_left,(Ctrl_1_Held_Logical).w	; is left being pressed?
 	beq.s	Obj_Sonic_NotLeft			; if not, branch
+	cmpi.b	#$8,anim(a0)				; is character ducking?
+	beq.w	Obj_Sonic_NotLeft
 	bsr.w	Sonic_MoveLeft
 ; loc_1A382:
 Obj_Sonic_NotLeft:
 	btst	#button_right,(Ctrl_1_Held_Logical).w	; is right being pressed?
 	beq.s	Obj_Sonic_NotRight			; if not, branch
+	cmpi.b	#$8,anim(a0)				; is character ducking?
+	beq.w	Obj_Sonic_NotRight
 	bsr.w	Sonic_MoveRight
 ; loc_1A38E:
 Obj_Sonic_NotRight:
@@ -1997,6 +2001,48 @@ loc_1AD8C:
 
 ; loc_1AD96:
 Sonic_SlopeResist:
+	cmpi.b	#2,(Option_PhysicsStyle).w
+	bne.w	+
+
+		move.b	angle(a0),d0
+		addi.b	#$60,d0
+		cmpi.b	#-$40,d0
+		bcc.s	locret_12D00
+		move.b	angle(a0),d0
+		jsr	(CalcSine).l
+		muls.w	#$20,d0
+		asr.l	#8,d0
+		tst.w	inertia(a0)
+		beq.s	loc_12D02
+		bmi.s	loc_12CFC
+		tst.w	d0
+		beq.s	locret_12CFA
+		add.w	d0,inertia(a0)
+
+locret_12CFA:
+		rts
+; ---------------------------------------------------------------------------
+
+loc_12CFC:
+		add.w	d0,inertia(a0)
+
+locret_12D00:
+		rts
+; ---------------------------------------------------------------------------
+
+loc_12D02:
+		move.w	d0,d1
+		bpl.s	loc_12D08
+		neg.w	d1
+
+loc_12D08:
+		cmpi.w	#$D,d1
+		bcs.s	locret_12D00
+		add.w	d0,inertia(a0)
+		rts
+; End of subroutine Sonic_SlopeResist
+
++
 	move.b	angle(a0),d0
 	addi.b	#$60,d0
 	cmpi.b	#$C0,d0
@@ -2020,7 +2066,6 @@ loc_1ADC6:
 
 return_1ADCA:
 	rts
-; End of subroutine Sonic_SlopeResist
 
 ; ---------------------------------------------------------------------------
 ; Subroutine to push Sonic down a slope while he's rolling
@@ -2069,6 +2114,78 @@ return_1AE06:
 
 ; loc_1AE08:
 Sonic_SlopeRepel:
+	cmpi.b	#2,(Option_PhysicsStyle).w
+	bne.w	+++
+		cmpi.b	#$2,anim(a0)
+		beq.w	++	
+		tst.w	x_vel(a0)					; is character moving?
+		beq.w	++							; if no, branch	
+		btst	#1,(Ctrl_1_Held_Logical).w	; is down being pressed?
+		bne.w	+							; if yes, branch
+		move.b	#0,anim(a0)					; make them walk
+		bra.w	++
++ ; note - some people might prefer ducking over rolling... Maybe make a preference option for that?			
+		move.w   inertia(a0),d0
+		bpl.s    Slope_ChkRollSpeed
+		neg.w    d0
+
+Slope_ChkRollSpeed: 
+		cmpi.w    #$100,d0        ; is Sonic moving at $100 speed or faster?
+		bhs.s    Slope_DoRoll    ; if not, branch
+		move.b #$8,anim(a0) ; use ducking animation
+		bra.w	+
+
+Slope_DoRoll:
+		move.b	#2,anim(a0)					; make them roll
+		bset	#2,status(a0)
+		move.b	#$E,y_radius(a0)			; adjust character's y_radius
+		move.b	#7,x_radius(a0)				; same for x_radius
+		addq.w	#5,y_pos(a0)
+		sfx		sfx_Roll
++	; the "real" start to SlopeRepel
+		tst.b	stick_to_convex(a0)
+		bne.s	locret_12D94
+		tst.w	move_lock(a0)
+		bne.s	loc_12DAC
+		move.b	angle(a0),d0
+		addi.b	#$18,d0
+		cmpi.b	#$30,d0
+		bcs.s	locret_12D94
+		move.w	inertia(a0),d0
+		bpl.s	loc_12D74
+		neg.w	d0
+
+loc_12D74:
+		cmpi.w	#$280,d0
+		bcc.s	locret_12D94
+		move.w	#$1E,move_lock(a0)
+		move.b	angle(a0),d0
+		addi.b	#$30,d0
+		cmpi.b	#$60,d0
+		bcs.s	loc_12D96
+		bset	#1,status(a0) ; in air status set
+
+locret_12D94:
+		rts
+; ---------------------------------------------------------------------------
+
+loc_12D96:
+		cmpi.b	#$30,d0
+		bcs.s	loc_12DA4
+		addi.w	#$80,inertia(a0)
+		rts
+; ---------------------------------------------------------------------------
+
+loc_12DA4:
+		subi.w	#$80,inertia(a0)
+		rts
+; ---------------------------------------------------------------------------
+
+loc_12DAC:
+		subq.w	#1,move_lock(a0)
+		rts
+
++
 	nop
 	tst.b	stick_to_convex(a0)
 	bne.s	return_1AE42
@@ -2091,7 +2208,7 @@ return_1AE42:
 
 loc_1AE44:
 	subq.w	#1,move_lock(a0)
-	rts
+	rts		
 ; End of function Sonic_SlopeRepel
 
 ; ---------------------------------------------------------------------------
@@ -2393,40 +2510,97 @@ return_1B09E:
 ; loc_1B0A0:
 Sonic_ResetOnFloor:
 	tst.b	pinball_mode(a0)
-	bne.s	Sonic_ResetOnFloor_Part3
-	move.b	#AniIDSonAni_Walk,anim(a0)
+	bne.w	Sonic_ResetOnFloor_Part3
+;=====================================================================================================================
+; if up is being held while landing from a momentumless jump, play look up animation. 
+; allows for activiting peelout immediately
+; however, to do so properly requires a frame perfect input... (enjoy, speedrunners!)
+;=====================================================================================================================	
+	btst	#button_up,(Ctrl_1_Held_Logical).w	; is up being pressed?
+	beq.w	.CheckIfDucking				; if not, branch
+	move.b	#7,anim(a0)				; use look up animation
+	bra.w	Sonic_ResetOnFloor_Part2	
+;=====================================================================================================================
+; if down is being held while landing from a momentumless jump, play ducking animation. 
+; allows for activiting spindash immediately
+; however, to do so properly requires a frame perfect input... (enjoy, speedrunners!)
+;=====================================================================================================================
+	.CheckIfDucking:	
+		btst	#button_down,(Ctrl_1_Held_Logical).w	; is down being pressed?
+		beq.w	.ReturnToWalkRunDash			; if not, branch
+		tst.w	inertia(a0)				; is character moving?
+		bne.w	.ContinueRolling			; if so, branch
+		bclr	#2,status(a0)				; clear rolling status	
+	        move.b	#$13,y_radius(a0)			; this increases Sonic's collision height to standing
+	        move.b	#9,x_radius(a0)				; adjust Sonic's collision width to standing
+		jsr	Sonic_Duck
+		bra.w	Adjust_Y_Pos	
+
+	.ContinueRolling:	
+        	jsr     Obj_Sonic_DoRoll			; make character roll
+        	bra.w   Sonic_ResetOnFloor_Part3		; still need to clear some flags, etc.
+
+	.ReturnToWalkRunDash:		
+		move.b	#0,anim(a0)
+;=====================================================================================================================
+; this code is called by the code that handles player standing on objects, like platforms or bridges
+; some routines outside of Tails' code can call Sonic_ResetOnFloor_Part2
+; when they mean to call Tails_ResetOnFloor_Part2, so fix that here
+;=====================================================================================================================
 ; loc_1B0AC:
-Sonic_ResetOnFloor_Part2:
-	; some routines outside of Tails' code can call Sonic_ResetOnFloor_Part2
-	; when they mean to call Tails_ResetOnFloor_Part2, so fix that here
-	cmpi.l	#Obj_Tails,id(a0)	; is this object ID Sonic (Obj_Sonic)?
-	beq.w	Tails_ResetOnFloor_Part2	; if not, branch to the Tails version of this code
+Sonic_ResetOnFloor_Part2: 
+	        cmpi.l	#Obj_Tails,id(a0)	                ; is this object ID Sonic (Obj_Sonic)?
+	        beq.w	Tails_ResetOnFloor_Part2                ; if not, branch to the Tails version of this code
+	        cmpi.l	#Obj_Knuckles,id(a0)                    ; is this object ID Knuckles?
+	        beq.w	Knuckles_ResetOnFloor_Part2             ; if it is, branch to the Knuckles version of this code
+		btst	#2,status(a0)				; is rolling status set?
+		beq.w	Sonic_ResetOnFloor_Part3		; if so, branch
+		bclr	#2,status(a0)				; clear rolling status
+		move.b	#$13,y_radius(a0)			; this increases Sonic's collision height to standing
+		move.b	#9,x_radius(a0)				; adjust Sonic's collision width to standing
+		tst.w	x_vel(a0)				; is character moving?
+		bne.w	.ReturnToWalkRunDash			; if so, branch	
 
-    cmpi.l	#Obj_Knuckles,id(a0)	; is this object ID Knuckles?
-	beq.w	Knuckles_ResetOnFloor_Part2	; if it is, branch to the Knuckles version of this code
+	.ReturnToIdle:	
+		move.b	#$5,anim(a0)				; use standing/idle animation
+		bra.s	Adjust_Y_Pos	
 
-	btst	#Status_Roll,status(a0)
-	beq.s	Sonic_ResetOnFloor_Part3
-	bclr	#Status_Roll,status(a0)
-	move.b	#$13,y_radius(a0) ; this increases Sonic's collision height to standing
-	move.b	#9,x_radius(a0)
-	move.b	#AniIDSonAni_Walk,anim(a0)	; use running/walking/standing animation
-	subq.w	#5,y_pos(a0)	; move Sonic up 5 pixels so the increased height doesn't push him into the ground
+	.ReturnToWalkRunDash:		
+		move.b	#0,anim(a0)				; use running/walking/standing animation
+
+	Adjust_Y_Pos:
+		subq.w	#5,y_pos(a0)				; move Sonic up 5 pixels so the increased height doesn't push him into the ground    
+;=====================================================================================================================
+; clear flags, and signify a true reset on floor
+;=====================================================================================================================
 ; loc_1B0DA:
-Sonic_ResetOnFloor_Part3:
-	bclr	#1,status(a0)
-	bclr	#5,status(a0)
-	bclr	#4,status(a0)
-	move.b	#0,jumping(a0)
+Sonic_ResetOnFloor_Part3:      
+	bclr	#1,status(a0)				; clear in air status
+	bclr	#5,status(a0)				; clear pushing status
+	bclr	#4,status(a0)				; clear rolljump status
+	move.b	#0,jumping(a0)				; clear jumping flag
 	move.w	#0,(Chain_Bonus_counter).w
 	move.b	#0,flip_angle(a0)
 	move.b	#0,flips_remaining(a0)
+;=====================================================================================================================
+; if rolling status was already set, we want to branch away from the end of this code
+; this prevents an issue where holding down would cause the character to duck rather than roll in most cases
+;=====================================================================================================================
+	btst    #2,status(a0)				; is status set to rolling?
+	beq.w   return_1B11E  
+;=====================================================================================================================
+; clear a few more flags
+;=====================================================================================================================
+	move.b  #0,flip_turned(a0)
 	move.w	#0,(Sonic_Look_delay_counter).w
-	clr.l	(HomingAttack_Object).l
-
-loc_1222A:
-
-return_1B11E:
+	cmpi.b	#$14,anim(a0)
+	bne.w	return_1B11E	
+	move.b	#0,anim(a0)
+	bra.w	return_1B11E
+;=====================================================================================================================
+; The end
+;=====================================================================================================================
+return_1B11E:	
 	rts
 
 ; =============== S U B R O U T I N E =======================================

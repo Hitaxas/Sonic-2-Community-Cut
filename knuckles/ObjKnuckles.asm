@@ -1114,48 +1114,98 @@ return_316ADE:					  ; ...
 
 ; =============== S U B	R O U T	I N E =======================================
 
-Knuckles_ResetOnFloor:				  ; ...
-    tst.b	pinball_mode(a0)
-    bne.s	Knuckles_ResetOnFloor_Part3
-    move.b	#0,anim(a0)
-; End of function Knuckles_ResetOnFloor
+Knuckles_ResetOnFloor:
+	tst.b	pinball_mode(a0)
+	bne.w	Knuckles_ResetOnFloor_Part3
+;=====================================================================================================================
+; if up is being held while landing from a momentumless jump, play look up animation. 
+; allows for activiting peelout immediately
+; however, to do so properly requires a frame perfect input... (enjoy, speedrunners!)
+;=====================================================================================================================	
+	btst	#button_up,(Ctrl_1_Held_Logical).w	; is up being pressed?
+	beq.w	.CheckIfDucking				; if not, branch
+	move.b	#7,anim(a0)				; use look up animation
+	bra.w	Knuckles_ResetOnFloor_Part2	
+;=====================================================================================================================
+; if down is being held while landing from a momentumless jump, play ducking animation. 
+; allows for activiting spindash immediately
+; however, to do so properly requires a frame perfect input... (enjoy, speedrunners!)
+;=====================================================================================================================
+	.CheckIfDucking:	
+		btst	#button_down,(Ctrl_1_Held_Logical).w	; is down being pressed?
+		beq.w	.ReturnToWalkRunDash			; if not, branch
+		tst.w	inertia(a0)				; is character moving?
+		bne.w	.ContinueRolling			; if so, branch
+		bclr	#2,status(a0)				; clear rolling status	
+	        move.b	#$13,y_radius(a0)			; this increases Sonic's collision height to standing
+	        move.b	#9,x_radius(a0)				; adjust Sonic's collision width to standing
+		jsr	Sonic_Duck
+		bra.w	Knuckles_Adjust_Y_Pos	
 
-; =============== S U B	R O U T	I N E =======================================
+	.ContinueRolling:	
+        	jsr     Obj_Sonic_DoRoll			; make character roll
+        	bra.w   Knuckles_ResetOnFloor_Part3		; still need to clear some flags, etc.
 
-Knuckles_ResetOnFloor_Part2:			  ; ...
-    move.b	y_radius(a0),d0
-    move.b	#$13,y_radius(a0)
-    move.b	#9,x_radius(a0)
-    btst	#2,status(a0)
-    beq.s	Knuckles_ResetOnFloor_Part3
-    bclr	#2,status(a0)
-    move.b	#0,anim(a0)
-    sub.b	#$13,d0
-    ext.w	d0
-    add.w	d0,y_pos(a0)
-
-Knuckles_ResetOnFloor_Part3:			  ; ...
-    bclr	#1,status(a0)
-    bclr	#5,status(a0)
-    bclr	#4,status(a0)
-    move.b	#0,jumping(a0)
-    move.w	#0,(Chain_Bonus_counter).w
-    move.b	#0,flip_angle(a0)
-    move.b	#0,flip_turned(a0)
-    move.b	#0,flips_remaining(a0)
-    move.w	#0,(Sonic_Look_delay_counter).w
-    move.b	#0,glidemode(a0)
-    cmp.b	#$20,anim(a0)
-    bcc.s	loc_316D5C
-    cmp.b	#$14,anim(a0)
-    bne.s	return_316D62
-
-loc_316D5C:					  ; ...
+	.ReturnToWalkRunDash:		
 		move.b	#0,anim(a0)
+;=====================================================================================================================
+; this code is called by the code that handles player standing on objects, like platforms or bridges
+; some routines outside of Tails' code can call Knuckles_ResetOnFloor_Part2
+; when they mean to call Tails_ResetOnFloor_Part2, so fix that here
+;=====================================================================================================================
+; loc_1B0AC:
+Knuckles_ResetOnFloor_Part2: 
+                btst	#2,status(a0)				; is rolling status set?
+		beq.w	Knuckles_ResetOnFloor_Part3		; if so, branch
+		bclr	#2,status(a0)				; clear rolling status
+		move.b	#$13,y_radius(a0)			; this increases Sonic's collision height to standing
+		move.b	#9,x_radius(a0)				; adjust Sonic's collision width to standing
+		tst.w	x_vel(a0)				; is character moving?
+		bne.w	.ReturnToWalkRunDash			; if so, branch	
 
-return_316D62:					  ; ...
-		rts
-; End of function Knuckles_ResetOnFloor_Part2
+	.ReturnToIdle:	
+		move.b	#$5,anim(a0)				; use standing/idle animation
+		bra.s	Knuckles_Adjust_Y_Pos	
+
+	.ReturnToWalkRunDash:		
+		move.b	#0,anim(a0)				; use running/walking/standing animation
+
+Knuckles_Adjust_Y_Pos:
+	subq.w	#5,y_pos(a0)				; move Sonic up 5 pixels so the increased height doesn't push him into the ground    
+;=====================================================================================================================
+; clear flags, and signify a true reset on floor
+;=====================================================================================================================
+; loc_1B0DA:
+Knuckles_ResetOnFloor_Part3:      
+	bclr	#1,status(a0)				; clear in air status
+	bclr	#5,status(a0)				; clear pushing status
+	bclr	#4,status(a0)				; clear rolljump status
+	move.b	#0,jumping(a0)				; clear jumping flag
+	move.b	#0,glidemode(a0)
+	move.w	#0,(Chain_Bonus_counter).w
+	move.b	#0,flip_angle(a0)
+	move.b	#0,flips_remaining(a0)
+;=====================================================================================================================
+; if rolling status was already set, we want to branch away from the end of this code
+; this prevents an issue where holding down would cause the character to duck rather than roll in most cases
+;=====================================================================================================================
+	btst    #2,status(a0)				; is status set to rolling?
+	beq.w   Kreturn_1B11E  
+;=====================================================================================================================
+; clear a few more flags
+;=====================================================================================================================
+	move.b  #0,flip_turned(a0)
+	move.w	#0,(Sonic_Look_delay_counter).w
+	cmpi.b	#$14,anim(a0)
+	bne.w	Kreturn_1B11E	
+	move.b	#0,anim(a0)
+	bra.w	Kreturn_1B11E
+;=====================================================================================================================
+; The end
+;=====================================================================================================================
+Kreturn_1B11E:	
+	rts
+; End of function Knuckles_ResetOnFloor
 
 
 ; =============== S U B	R O U T	I N E =======================================
@@ -1188,9 +1238,9 @@ loc_316DA0:					  ; ...
 loc_316DAE:					  ; ...
 		bsr.w	Sonic_HurtStop
 		bsr.w	Sonic_LevelBound
-		bsr.w	Sonic_RecordPos
+		jsr	Sonic_RecordPos
 		bsr.w	Knuckles_Animate
-		bsr.w	Sonic_Water
+		jsr	Sonic_Water
 		bsr.w	LoadKnucklesDynPLC
 		jmp	DisplaySprite
 ; End of function Obj_Knuckles_Hurt
@@ -1207,7 +1257,7 @@ JmpToK_KillCharacter:				  ; ...
 Knuckles_HurtInstantRecover:			  ; ...
     subq.b	#2,routine(a0)
     move.b	#0,routine_secondary(a0)
-    bsr.w	Sonic_RecordPos
+    jsr	Sonic_RecordPos
     bsr.w	Knuckles_Animate
     bsr.w	LoadKnucklesDynPLC
     jmp	DisplaySprite
@@ -1228,7 +1278,7 @@ Obj_Knuckles_Dead:					  ; ...
 loc_316E4A:					  ; ...
 		bsr.w	CheckGameOver
 		jsr	ObjectMoveAndFall
-		bsr.w	Sonic_RecordPos
+		jsr	Sonic_RecordPos
 		bsr.w	Knuckles_Animate
 		bsr.w	LoadKnucklesDynPLC
 		jmp	DisplaySprite
