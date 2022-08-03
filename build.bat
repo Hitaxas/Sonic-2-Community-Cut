@@ -67,16 +67,18 @@ REM // combine the assembler output into a rom
 REM // fix some pointers and things that are impossible to fix from the assembler without un-splitting their data
 "win32/fixpointer" s2.h s2built.md   off_3A294 MapRUnc_Sonic $2D 0 4   word_728C_user Obj_EndingController_MapUnc_7240 2 2 1
 
-"win32/ips/ipspatch" create SONIC2_W.68K s2built.md s2w.ips
+"win32/ips/ipspatch" create OrigSONIC2_W.68K s2built.md patch.ips
 
 REM // done -- pause if we seem to have failed, then exit
 IF NOT EXIST s2built.md pause & exit /b
 "ErrorDebugger/ConvSym.exe" s2.lst s2built.md -input as_lst -a
 
-REM REM // fix the rom header (checksum)
+REM // fix the rom header (checksum)
 "win32/fixheader" s2built.md
 
-"win32/ips/ipspatch" create SONIC2_W.68K s2built.md s2w.ips
+copy /y s2built.md SONIC2_W.68K
+
+"win32/ips/ipspatch" create OrigSONIC2_W.68K s2built.md patch.ips
 
 REM // if there were errors/warnings, a log file is produced
 IF EXIST s2.log goto LABLERROR4
