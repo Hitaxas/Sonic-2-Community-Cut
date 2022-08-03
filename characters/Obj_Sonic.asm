@@ -2118,6 +2118,8 @@ Sonic_SlopeRepel:
 	bne.w	+++
 		cmpi.b	#$2,anim(a0)
 		beq.w	++	
+		cmpi.b	#$D,anim(a0)
+		beq.w	++
 		tst.w	x_vel(a0)					; is character moving?
 		beq.w	++							; if no, branch	
 		btst	#1,(Ctrl_1_Held_Logical).w	; is down being pressed?
