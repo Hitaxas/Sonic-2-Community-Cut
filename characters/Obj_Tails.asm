@@ -3031,8 +3031,8 @@ TAnim_End:
 ; loc_1CE5C:
 TAnim_WalkRunZoom: ; a0=character
 	; note: for some reason SAnim_WalkRun doesn't need to do this here...
-	subq.b	#1,anim_frame_duration(a0)	; subtract 1 from Tails' frame duration
-	bpl.s	TAnim_Delay			; if time remains, branch
+	;subq.b	#1,anim_frame_duration(a0)	; subtract 1 from Tails' frame duration
+	;bpl.s	TAnim_Delay			; if time remains, branch
 
 	addq.b	#1,d0		; is the end flag = $FF ?
 	bne.w	TAnim_Roll	; if not, branch
@@ -3091,6 +3091,18 @@ TAnim_WalkRunZoom: ; a0=character
 
 ; loc_1CEEE:
 TAnim_SpeedSelected:
+	moveq	#0,d1
+	move.b	anim_frame(a0),d1
+	move.b	1(a1,d1.w),d0
+	cmpi.b	#-1,d0
+	bne.s	+
+	move.b	#0,anim_frame(a0)
+	move.b	1(a1),d0
++
+	move.b	d0,mapping_frame(a0)
+	add.b	d3,mapping_frame(a0)
+	subq.b	#1,anim_frame_duration(a0)
+	bpl.s	Treturn_1B4AC
 	neg.w	d2
 	addi.w	#$800,d2
 	bpl.s	+
@@ -3098,8 +3110,9 @@ TAnim_SpeedSelected:
 +
 	lsr.w	#8,d2
 	move.b	d2,anim_frame_duration(a0)	; modify frame duration
-	bsr.w	TAnim_Do2
-	add.b	d3,mapping_frame(a0)
+	addq.b	#1,anim_frame(a0)		; modify frame number
+
+Treturn_1B4AC:
 	rts
 ; ===========================================================================
 ; loc_1CF08

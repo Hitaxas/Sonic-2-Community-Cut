@@ -33433,15 +33433,17 @@ loc_19AB6:
 ; ===========================================================================
 ;loc_19AC4:
 SolidObject_TestClearPush:
-	move.l	d6,d4
-	addq.b	#pushing_bit_delta,d4
-	btst	d4,status(a0)
-	beq.s	loc_19AEA
-	cmpi.b	#AniIDSonAni_Roll,anim(a1)
+        move.l  d6,d4
+        addq.b  #2,d4
+        btst    d4,status(a0)
+        beq.s   loc_19AEA
+        cmpi.b  #2,anim(a1)
+        beq.s   loc_19ADC
+	btst	#1,status(a1) ; in air status set
 	beq.s	loc_19ADC
-	cmpi.b	#AniIDSonAni_Spindash,anim(a1)
-	beq.s	loc_19ADC
-	move.w	#AniIDSonAni_Run,anim(a1)
+	tst.b	spindash_flag(a1)
+	bne.s	loc_19ADC
+        move.w  #1,anim(a1)
 
 loc_19ADC:
 	move.l	d6,d4
@@ -34053,11 +34055,16 @@ Obj_TailsTails_Main:
 	bpl.s	+
 	ori.w	#high_priority,art_tile(a0)
 +
-	moveq	#0,d0
-	move.b	anim(a2),d0
-	btst	#5,status(a2)
-	beq.s	+
-	moveq	#4,d0
+    moveq   #0,d0
+    move.b  anim(a2),d0
+    btst    #5,status(a2)
+    beq.s   +
+    ; This is checking if parent (Tails) is in its pushing animation
+    cmpi.b  #$63,mapping_frame(a2)
+    blo.s   +
+    cmpi.b  #$66,mapping_frame(a2)
+    bhi.s   +
+    moveq   #4,d0
 +
 	; This is here so Obj_TailsTailsAni_Flick works
 	; It changes anim(a0) itself, so we don't want the below code changing it as well
@@ -37170,8 +37177,8 @@ ObjCheckLeftWallDist:
 	move.w	y_pos(a0),d2
 	; Engine bug: colliding with left walls is erratic with this function.
 	; The cause is this: a missing instruction to flip collision on the found
-	; 16x16 block; this one:
-	;eori.w	#$F,d3
+	; 16x16 block
+	eori.w	#$F,d3	; this one
 	lea	(Primary_Angle).w,a4
 	move.b	#0,(a4)
 	movea.w	#-$10,a3
