@@ -1675,11 +1675,11 @@ Sonic_CheckGoSuper:
 	bne.w	Sonic_RevertToNormal
 	
 	cmpi.b	#7,(Emerald_count).w	; does Sonic have exactly 7 emeralds?
-	bne.s	return_1ABA4			; if not, branch
+	bne.w	return_1ABA4			; if not, branch
 	tst.b	(Update_HUD_timer).w	; has Sonic reached the end of the act?
-	beq.s	return_1ABA4			; if yes, branch
+	beq.w	return_1ABA4			; if yes, branch
 	cmpi.w	#50,(Ring_count).w		; does Sonic have at least 50 rings?
-	blo.s	return_1ABA4			; if not, branch
+	blo.w	return_1ABA4			; if not, branch
 	bclr    #2,status(a0)
 	bclr    #4,status(a0)
 	move.b  #$13,y_radius(a0)
