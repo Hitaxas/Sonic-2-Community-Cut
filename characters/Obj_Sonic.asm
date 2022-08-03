@@ -886,9 +886,9 @@ Sonic_TurnLeft:
 	move.w	#-$80,d0
 +
 	move.w	d0,inertia(a0)
-	move.b	angle(a0),d0
-	addi.b	#$20,d0
-	andi.b	#$C0,d0
+	move.b	angle(a0),d1
+	addi.b	#$20,d1
+	andi.b	#$C0,d1
 	bne.s	return_1A744
 	cmpi.w	#$400,d0
 	blt.s	return_1A744
@@ -939,9 +939,9 @@ Sonic_TurnRight:
 	move.w	#$80,d0
 +
 	move.w	d0,inertia(a0)
-	move.b	angle(a0),d0
-	addi.b	#$20,d0
-	andi.b	#$C0,d0
+	move.b	angle(a0),d1
+	addi.b	#$20,d1
+	andi.b	#$C0,d1
 	bne.s	return_1A7C4
 	cmpi.w	#-$400,d0
 	bgt.s	return_1A7C4
@@ -1680,6 +1680,10 @@ Sonic_CheckGoSuper:
 	beq.s	return_1ABA4			; if yes, branch
 	cmpi.w	#50,(Ring_count).w		; does Sonic have at least 50 rings?
 	blo.s	return_1ABA4			; if not, branch
+	bclr    #2,status(a0)
+	bclr    #4,status(a0)
+	move.b  #$13,y_radius(a0)
+	move.b  #9,x_radius(a0)
 
 Sonic_Transform:
 	; HJW: not using a0 so that it can be called from monitor and still work
@@ -2138,12 +2142,7 @@ Slope_ChkRollSpeed:
 		bra.w	+
 
 Slope_DoRoll:
-		move.b	#2,anim(a0)					; make them roll
-		bset	#2,status(a0)
-		move.b	#$E,y_radius(a0)			; adjust character's y_radius
-		move.b	#7,x_radius(a0)				; same for x_radius
-		addq.w	#5,y_pos(a0)
-		sfx		sfx_Roll
+		jsr	Obj_Sonic_DoRoll
 +	; the "real" start to SlopeRepel
 		tst.b	stick_to_convex(a0)
 		bne.s	locret_12D94

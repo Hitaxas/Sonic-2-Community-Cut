@@ -1594,9 +1594,9 @@ Tails_TurnLeft:
 	move.w	#-$80,d0
 +
 	move.w	d0,inertia(a0)
-	move.b	angle(a0),d0
-	addi.b	#$20,d0
-	andi.b	#$C0,d0
+	move.b	angle(a0),d1
+	addi.b	#$20,d1
+	andi.b	#$C0,d1
 	bne.s	return_1C328
 	cmpi.w	#$400,d0
 	blt.s	return_1C328
@@ -1647,9 +1647,9 @@ Tails_TurnRight:
 	move.w	#$80,d0
 +
 	move.w	d0,inertia(a0)
-	move.b	angle(a0),d0
-	addi.b	#$20,d0
-	andi.b	#$C0,d0
+	move.b	angle(a0),d1
+	addi.b	#$20,d1
+	andi.b	#$C0,d1
 	bne.s	return_1C3A8
 	cmpi.w	#-$400,d0
 	bgt.s	return_1C3A8

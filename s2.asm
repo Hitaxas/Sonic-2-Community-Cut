@@ -63,10 +63,12 @@ useFullWaterTables =	1
 ; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ; Simplifying macros and functions
 	include "s2.macros.asm"
+	even
 
 ; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ; Error debugger
 	include	"ErrorDebugger/Debugger.asm"
+	even
 
 ; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ; AMPS related macros
@@ -4779,11 +4781,11 @@ Level_Iterate:
 	addq.w	#1,(Timer_frames).w ; add 1 to level timer
 	bsr.w	MoveSonicInDemo
 	bsr.w	WaterEffects
+	bsr.w	UpdateWaterSurface
 	jsr	(RunObjects).l
 	tst.b	(Level_Inactive_flag).w
 	bne.w	Level
 	jsrto	(DeformBgLayer).l, JmpTo_DeformBgLayer
-	bsr.w	UpdateWaterSurface
 	jsr	(RingsManager).l
 	cmpi.b	#casino_night_zone,(Current_Zone).w	; is it CNZ?
 	bne.s	+			; if not, branch past jsr
@@ -4938,20 +4940,22 @@ InitPlayers_TailsAlone:
 
 ; sub_44E4:
 UpdateWaterSurface:
-	tst.b	(Water_flag).w
-	beq.s	++	; rts
-	move.w	(Camera_X_pos).w,d1
-	btst	#0,(Timer_frames+1).w
-	beq.s	+
-	addi.w	#$20,d1
-+		; match obj x-position to screen position
-	move.w	d1,d0
-	addi.w	#$60-40,d0
-	move.w	d0,(WaterSurface1+x_pos).w
-	addi.w	#$120-40,d1
-	move.w	d1,(WaterSurface2+x_pos).w
+    tst.b    (Water_flag).w
+    beq.s    ++    ; rts
+    move.w    (Camera_X_pos).w,d1
+    btst    #button_start,(Ctrl_1_Press).w        ; is Start button pressed?
+    bne.s    +                                    ; if yes, branch
+    btst    #0,(Timer_frames+1).w
+    beq.s    +
+    addi.w    #$20,d1
++        ; match obj x-position to screen position
+    move.w    d1,d0
+    addi.w    #$60,d0
+    move.w    d0,(WaterSurface1+x_pos).w
+    addi.w    #$120,d1
+    move.w    d1,(WaterSurface2+x_pos).w
 +
-	rts
+    rts
 ; End of function UpdateWaterSurface
 
 
@@ -18006,6 +18010,7 @@ CalcBlockVRAMPos2:
 	tst.w	(Two_player_mode).w
 	bne.s	CalcBlockVRAMPos_2P
 	add.w	4(a3),d4	; add Y pos
+CalcBlockVRAMPos_NoCamera:
 	andi.w	#$F0,d4		; round down to the nearest 16-pixel boundary
 	andi.w	#$1F0,d5	; round down to the nearest 16-pixel boundary
 	lsl.w	#4,d4		; make it into units of $100 - the height in plane A of a 16x16
@@ -18021,7 +18026,8 @@ CalcBlockVRAMPos2:
 CalcBlockVRAMPos_2P:
 	add.w	4(a3),d4
 
-loc_E2AC:
+;loc_E2AC:
+CalcBlockVRAMPos_2P_NoCamera:
 	andi.w	#$1F0,d4
 	andi.w	#$1F0,d5
 	lsl.w	#3,d4
@@ -18081,9 +18087,8 @@ DrawInitialBG:
 	lea	(Camera_BG_X_pos).w,a3
 	lea	(Level_Layout+$80).w,a4	; background
 	move.w	#vdpComm(VRAM_Plane_B_Name_Table,VRAM,WRITE)>>16,d2
-	moveq	#0,d4
-	cmpi.b	#casino_night_zone,(Current_Zone).w
-	beq.w	++
+        cmpi.b  #casino_night_zone,(Current_Zone).w
+        beq.w   DrawInitialBG_LoadWhole64x32Plane
 	tst.w	(Two_player_mode).w
 	beq.w	+
 	cmpi.b	#mystic_cave_zone,(Current_Zone).w
@@ -18108,25 +18113,30 @@ DrawInitialBG:
 
 	rts
 ; ===========================================================================
-; dead code
-	moveq	#-$10,d4
-
-	moveq	#$F,d6
--	movem.l	d4-d6,-(sp)
-	moveq	#0,d5
-	move.w	d4,d1
-	bsr.w	CalcBlockVRAMPosB
-	move.w	d1,d4
-	moveq	#0,d5
-	moveq	#$1F,d6
-	move	#$2700,sr
-	bsr.w	DrawBlockRow
-	move	#$2300,sr
-	movem.l	(sp)+,d4-d6
-	addi.w	#$10,d4
-	dbf	d6,-
-
-	rts
+DrawInitialBG_LoadWhole64x32Plane:
+        moveq   #0,d4
+ 
+        moveq   #16-1,d6 ; Height of plane in blocks
+-       movem.l d4-d6,-(sp)
+        moveq   #0,d5
+        move.w  d4,d1
+        ; This is just a fancy efficient way of doing 'if true then call this, else call that'.
+        pea     +(pc)
+        tst.w   (Two_player_mode).w
+        beq.w   CalcBlockVRAMPos_NoCamera
+        bra.w   CalcBlockVRAMPos_2P_NoCamera
++
+        move.w  d1,d4
+        moveq   #0,d5
+        moveq   #32-1,d6 ; Width of plane in blocks
+        move    #$2700,sr
+        bsr.w   DrawBlockRow3
+        move    #$2300,sr
+        movem.l (sp)+,d4-d6
+        addi.w  #16,d4
+        dbf     d6,-
+ 
+        rts
 ; ===========================================================================
 
 loc_E396:
@@ -18136,7 +18146,7 @@ loc_E396:
 -	movem.l	d4-d6,-(sp)
 	moveq	#0,d5
 	move.w	d4,d1
-	bsr.w	loc_E2AC
+	bsr.w	CalcBlockVRAMPos_2P_NoCamera
 	move.w	d1,d4
 	moveq	#0,d5
 	moveq	#$1F,d6
@@ -38989,7 +38999,7 @@ Obj_WaterSurface_Action:
 	tst.b	objoff_32(a0)
 	bne.s	Obj_WaterSurface_Animate
 	btst	#button_start,(Ctrl_1_Press).w	; is Start button pressed?
-	beq.s	loc_20962	; if not, branch
+	beq.w	BranchTo_JmpTo10_DisplaySprite	; if not, branch
 	addq.b	#3,mapping_frame(a0)	; use different frames
 	move.b	#1,objoff_32(a0)	; stop animation
 	bra.s	loc_20962
@@ -45141,7 +45151,7 @@ loc_2645E:
 	btst	#0,status(a0)
 	beq.s	loc_2647A
 	not.w	d0
-	addi.w	#$27,d0
+	addi.w    #2*$1C,d0
 
 loc_2647A:
 	tst.w	d0
@@ -50025,10 +50035,18 @@ Obj_MCZDrawbridge_BridgeUp:
 	bpl.s	.no
 	sfx	sfx_DrawbridgeMove
 
-.no	cmpi.b	#$81,status(a0)
-	bne.s	+
-	move.w	objoff_30(a0),x_pos(a0)
-	subi.w	#$48,x_pos(a0)
+.no	
+	btst    #1,status(a0)
+	beq.s   +
+	move.b  #$40,width_pixels(a0)
+	move.w  objoff_32(a0),y_pos(a0)
+	move.w  objoff_30(a0),x_pos(a0)
+	moveq   #$48,d0
+	btst    #0,status(a0)
+	beq.s   .notxflipped
+	neg.w   d0
+.notxflipped:
+	add.w   d0,x_pos(a0)
 +
 	tst.b	objoff_36(a0)
 	beq.s	loc_2A188
@@ -50061,12 +50079,11 @@ loc_2A18A:
 	move.w	#$13,d1
 	move.w	#$40,d2
 	move.w	#$41,d3
-	move.b	angle(a0),d0
-	beq.s	loc_2A1A8
-	cmpi.b	#$40,d0
-	beq.s	loc_2A1B4
-	cmpi.b	#-$40,d0
-	bhs.s	loc_2A1B4
+	move.b  angle(a0),d0
+	cmpi.b  #$40,d0
+	beq.s   loc_2A1B4   ; Straight down
+	cmpi.b  #$80,d0
+	bhi.s   loc_2A1B4   ; Anywhere upwards between left and right
 
 loc_2A1A8:
 	move.w	#$4B,d1
@@ -54552,19 +54569,12 @@ Boss_Defeat:
 
 ;loc_2D5DE:
 Boss_MoveObject:
-	move.l	(Boss_X_pos).w,d2
-	move.l	(Boss_Y_pos).w,d3
-	move.w	(Boss_X_vel).w,d0
-	ext.l	d0
-	asl.l	#8,d0
-	add.l	d0,d2
-	move.w	(Boss_Y_vel).w,d0
-	ext.l	d0
-	asl.l	#8,d0
-	add.l	d0,d3
-	move.l	d2,(Boss_X_pos).w
-	move.l	d3,(Boss_Y_pos).w
-	rts
+    movem.w (Boss_X_vel).w,d0/d2            ; Does sign extension for free
+    asl.l   #8,d0                           ; shift velocity to line up with the middle 16 bits of the 32-bit position
+    add.l   d0,(Boss_X_pos).w               ; add X speed to X position ; note this affects the subpixel position
+    asl.l   #8,d2                           ; shift velocity to line up with the middle 16 bits of the 32-bit position
+    add.l   d2,(Boss_Y_pos).w               ; add Y speed to Y position ; note this affects the subpixel position
+    rts
 ; ===========================================================================
 ; a1 = animation script pointer
 ;AnimationArray: up to 8 2-byte entries:
@@ -55052,19 +55062,12 @@ Obj_CPZBoss_Defeated:
 ; ===========================================================================
 
 Obj_CPZBoss_Main_Move:
-	move.l	Obj_CPZBoss_x_pos_next(a0),d2
-	move.l	Obj_CPZBoss_y_pos_next(a0),d3
-	move.w	x_vel(a0),d0
-	ext.l	d0
-	asl.l	#8,d0
-	add.l	d0,d2
-	move.w	y_vel(a0),d0
-	ext.l	d0
-	asl.l	#8,d0
-	add.l	d0,d3
-	move.l	d2,Obj_CPZBoss_x_pos_next(a0)
-	move.l	d3,Obj_CPZBoss_y_pos_next(a0)
-	rts
+    movem.w x_vel(a0),d0/d2                 ; Does sign extension for free
+    asl.l   #8,d0                           ; shift velocity to line up with the middle 16 bits of the 32-bit position
+    add.l   d0,Obj_CPZBoss_x_pos_next(a0)   ; add X speed to X position ; note this affects the subpixel position
+    asl.l   #8,d2                           ; shift velocity to line up with the middle 16 bits of the 32-bit position
+    add.l   d2,Obj_CPZBoss_y_pos_next(a0)   ; add Y speed to Y position ; note this affects the subpixel position
+    rts
 ; ===========================================================================
 ; Creates an explosion every 8 frames at a random position relative to boss.
 
@@ -56209,9 +56212,9 @@ loc_2E9A8:
 	rts
 ; ===========================================================================
 +
-	addq.b	#2,routine_secondary(a0)
+	addq.b	#2,routine(a0)
 	move.l	#Obj_CPZBoss_MapUnc_2EEA0,mappings(a0)
-	move.w	#make_art_tile(ArtTile_ArtNem_EggpodJets_1,0,0),art_tile(a0)
+	move.w  #make_art_tile(ArtTile_ArtNem_BossSmoke_1,1,0),art_tile(a0)
 	jsrto	(Adjust2PArtPointer).l, JmpTo60_Adjust2PArtPointer
 	move.b	#0,mapping_frame(a0)
 	move.b	#5,anim_frame_duration(a0)
@@ -57453,11 +57456,11 @@ Obj_HTZBoss_Mobile_Flamethrower:
 	move.b	#$2F,objoff_3E(a0)
 
 loc_2FDAA:
-	bsr.w	loc_300A4
-	bsr.w	loc_2FEDE
-	lea	(Ani_Obj_HTZBoss).l,a1
-	bsr.w	AnimateBoss
-	jmpto	(DisplaySprite).l, JmpTo36_DisplaySprite
+    bsr.w   loc_2FEDE
+    lea (Ani_Obj_HTZBoss).l,a1
+    bsr.w   AnimateBoss
+    bsr.w   loc_300A4
+    jmpto   (DisplaySprite).l, JmpTo36_DisplaySprite
 ; ===========================================================================
 
 ; loc_2FDC0:
@@ -72914,6 +72917,7 @@ loc_3BCCC:
 ; ===========================================================================
 
 loc_3BCD6:
+	addq.w #4,sp
 	bsr.w	loc_3B7BC
 	bra.w	JmpTo65_DeleteObject
 ; ===========================================================================
