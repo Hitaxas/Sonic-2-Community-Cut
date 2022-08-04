@@ -1444,7 +1444,7 @@ Water_Ripple_Counter:	ds.w 1
 Options_RAM_Start:
 
 Player_option:			ds.b 1		; 0 = Sonic and Tails, 1 = Sonic, 2 = Tails
-Option_PhysicsStyle:			ds.b 1 ; 0 = S2, 1 = S1, 2 = S3K, 3 = SM
+Option_PhysicsStyle:			ds.b 1 ; 0 = S2, 1 = S1, 2 = S3K, 3 = SM, 4 = Joey, 5 = Hitaxas
 
 Option_Shields:			ds.b 1 ; see OptionsScreen/Data.asm, i probably got way too granular with these choices lmao
 Option_InvincShields:	ds.b 1

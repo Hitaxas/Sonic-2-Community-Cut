@@ -1299,6 +1299,10 @@ Sonic_Roll:
 
 	cmpi.b	#4,(Option_PhysicsStyle).w
 	beq.s	Sonic_Roll_SlowDucking
+
+	cmpi.b	#5,(Option_PhysicsStyle).w
+	beq.s	Sonic_Roll_SlowDucking
+	
 	bra.s	Sonic_Roll_NoSlowDucking
 
 Sonic_Roll_SlowDucking:
@@ -2005,9 +2009,11 @@ loc_1AD8C:
 
 ; loc_1AD96:
 Sonic_SlopeResist:
+	cmpi.b	#5,(Option_PhysicsStyle).w
+	beq.w	+
 	cmpi.b	#2,(Option_PhysicsStyle).w
-	bne.w	+
-
+	bne.w	++
++
 		move.b	angle(a0),d0
 		addi.b	#$60,d0
 		cmpi.b	#-$40,d0
@@ -2118,8 +2124,11 @@ return_1AE06:
 
 ; loc_1AE08:
 Sonic_SlopeRepel:
+	cmpi.b	#5,(Option_PhysicsStyle).w
+	beq.w	Sonic_S2SlopeRepel
 	cmpi.b	#2,(Option_PhysicsStyle).w
 	bne.w	+++
+Sonic_S2SlopeRepel:	
 		cmpi.b	#$2,anim(a0)
 		beq.w	++	
 		cmpi.b	#$D,anim(a0)
