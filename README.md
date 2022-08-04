@@ -18,4 +18,4 @@ As an extra:
 
 Ported S3K's Player_SlopeResist and Player_SlopeRepel, but modified slightly to display the walking animation if you rollstop on a slope.
 
-This is only used if physics mode is set to S3K. 
+This is only used if physics mode is set to S3K or Hitaxas. 
