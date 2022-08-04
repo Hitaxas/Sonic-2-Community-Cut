@@ -3,7 +3,7 @@
 This hack works with heyjoeway's GPGX fork (https://github.com/heyjoeway/Genesis-Plus-GX) to make a widescreen hack of Sonic 2 that adds many new features and bugfixes. 
 Check this page for a list on initial enhancements made by heyjoeway: https://heyjoeway.github.io/s2cx/
 
-For changes made by me:
+For initial changes made by me:
 
 Modified ResetOnFloor routines to fix these issues mentioned here:
 
