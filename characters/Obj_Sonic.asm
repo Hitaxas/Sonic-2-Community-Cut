@@ -2592,6 +2592,7 @@ Sonic_ResetOnFloor_Part3:
 	move.w	#0,(Chain_Bonus_counter).w
 	move.b	#0,flip_angle(a0)
 	move.b	#0,flips_remaining(a0)
+	clr.l	(HomingAttack_Object).l
 ;=====================================================================================================================
 ; if rolling status was already set, we want to branch away from the end of this code
 ; this prevents an issue where holding down would cause the character to duck rather than roll in most cases
